@@ -968,7 +968,37 @@
                 if (data.error) {
                     showError(data.error);
                 } else {
-                    addMessageWithTyping(data.response, 'ai');
+                    // Handle structured JSON response
+                    if (data.type === 'structured_json') {
+                        const responseData = data.response;
+                        let displayText = '';
+                        
+                        if (Array.isArray(responseData)) {
+                            // Multiple JSON objects
+                            responseData.forEach((item, index) => {
+                                displayText += `[${index + 1}] ${item.title}\n`;
+                                displayText += `Тип: ${item.type}\n`;
+                                if (item.description) displayText += `Описание: ${item.description}\n`;
+                                if (item.priority) displayText += `Приоритет: ${item.priority}\n`;
+                                if (item.tags && item.tags.length > 0) displayText += `Теги: ${item.tags.join(', ')}\n`;
+                                if (item.dueDate) displayText += `Срок: ${item.dueDate}\n`;
+                                displayText += '\n';
+                            });
+                        } else {
+                            // Single JSON object
+                            displayText += `📋 ${responseData.title}\n`;
+                            displayText += `Тип: ${responseData.type}\n`;
+                            if (responseData.description) displayText += `Описание: ${responseData.description}\n`;
+                            if (responseData.priority) displayText += `Приоритет: ${responseData.priority}\n`;
+                            if (responseData.tags && responseData.tags.length > 0) displayText += `Теги: ${responseData.tags.join(', ')}\n`;
+                            if (responseData.dueDate) displayText += `Срок: ${responseData.dueDate}\n`;
+                        }
+                        
+                        addMessageWithTyping(displayText.trim(), 'ai');
+                    } else {
+                        // Regular text response
+                        addMessageWithTyping(data.response, 'ai');
+                    }
                 }
             } catch (error) {
                 showError('Ошибка подключения к серверу');
