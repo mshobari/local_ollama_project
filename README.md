@@ -30,7 +30,7 @@ powershell -ExecutionPolicy Bypass -File get_ip.ps1
 
 ## Системные требования
 
-- Windows 10/11
+- Windows 10 / 11
 - Python 3.8+
 - Минимум 8 ГБ RAM (рекомендуется 16 ГБ)
 - Свободное место: 10 ГБ для модели
@@ -61,9 +61,14 @@ D:\local_ollama_project\
 │   └── index.html         # Веб-интерфейс
 ├── chat_history.db        # База данных истории разговоров
 ├── start_server.bat       # Скрипт запуска
+<<<<<<< HEAD
 ├── get_ip.ps1            # Получение IP адресов
 ├── requirements.txt       # Python зависимости
 └── .gitignore            # Git ignore файл
+=======
+├── get_ip.ps1             # Получение IP адресов
+└── requirements.txt       # Python зависимости
+>>>>>>> c34b88ec10cefd61ef3fd2b8a827040f83a93070
 ```
 
 ## Конфигурация
@@ -268,6 +273,10 @@ New-NetFirewallRule -DisplayName "Voicaj AI Assistant" -Direction Inbound -Proto
 - Замените файлы `app.py` и `templates/index.html`
 - Перезапустите сервер
 
+<<<<<<< HEAD
 ---
 
 **Поздравляем! Ваш Voicaj LLM API сервер готов для интеграции с iOS!**
+=======
+**Поздравляем! Ваш локальный AI ассистент готов к работе!**
+>>>>>>> c34b88ec10cefd61ef3fd2b8a827040f83a93070
