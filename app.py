@@ -61,6 +61,39 @@ def save_message(session_id, user_message, ai_response):
     conn.commit()
     conn.close()
 
+# Structured prompt for Voicaj LLM Schema
+VOICAJ_PROMPT = """
+Ты Voicaj AI ассистент. ТВОЯ ЕДИНСТВЕННАЯ ЗАДАЧА - возвращать ТОЛЬКО валидный JSON согласно Voicaj LLM Schema.
+
+Доступные типы:
+- task: задачи, дедлайны, напоминания, рабочие дела
+- diary_entry: личные заметки, размышления, эмоциональные выражения
+- habit: повторяющиеся действия, цели, отслеживание привычек
+- health: показатели здоровья, сон, шаги, пульс
+- workout: физические активности, упражнения, фитнес
+- meal: логирование еды, приемы пищи, калории
+- goal: долгосрочные цели, достижения
+- advice: коучинг, запросы помощи, рекомендации
+- study_note: обучение, лекции, учебные материалы
+- time_log: учет времени, логирование активности
+- shared_task: совместные задачи, командная работа
+- focus_session: pomodoro, глубокие рабочие сессии
+- mood_entry: отслеживание эмоционального состояния
+- expense: финансовые транзакции, покупки
+- travel_plan: поездки, отпуска, планирование путешествий
+
+КРИТИЧЕСКИ ВАЖНО:
+1. НИКОГДА не добавляй текст до или после JSON
+2. НИКОГДА не объясняй что ты делаешь
+3. Возвращай ТОЛЬКО валидный JSON объект
+4. Если несколько смыслов - возвращай массив JSON объектов
+5. Все поля title, description, tags на русском языке
+6. Создавай МАКСИМАЛЬНО ПОДРОБНЫЕ описания используя контекст
+
+Пример ответа:
+{"type": "task", "title": "Завершить отчет", "description": "Детальное описание задачи с учетом контекста", "priority": "high", "tags": ["работа"], "dueDate": "2025-01-10 17:00", "address": null}
+"""
+
 # Отправка запроса к Ollama
 def send_to_ollama(message, history=None):
     try:
@@ -68,19 +101,19 @@ def send_to_ollama(message, history=None):
         context = ""
         if history:
             for user_msg, ai_msg, _ in reversed(history):
-                context += f"Пользователь: {user_msg}\nАссистент: {ai_msg}\n\n"
+                context += f"User: {user_msg}\nAssistant: {ai_msg}\n\n"
         
-        # Подготавливаем полное сообщение с контекстом
-        full_message = context + f"Пользователь: {message}\nАссистент:"
+        # Подготавливаем полное сообщение с контекстом и схемой
+        full_message = VOICAJ_PROMPT + "\n\n" + context + f"User: {message}\nAssistant:"
         
         payload = {
             "model": MODEL_NAME,
             "prompt": full_message,
             "stream": False,
             "options": {
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "max_tokens": 2048
+                "temperature": 0.1,  # Very low temperature for consistent JSON
+                "top_p": 0.8,
+                "max_tokens": 1024
             }
         }
         
@@ -90,14 +123,63 @@ def send_to_ollama(message, history=None):
         
         if response.status_code == 200:
             result = response.json()
-            return result.get('response', 'Извините, не удалось получить ответ.')
+            raw_response = result.get('response', '')
+            
+            # Try to parse JSON response
+            try:
+                # Clean the response and try to parse JSON
+                cleaned_response = raw_response.strip()
+                
+                # Remove any text after the JSON (like "User:" or "Assistant:")
+                if "User:" in cleaned_response:
+                    cleaned_response = cleaned_response.split("User:")[0].strip()
+                if "Assistant:" in cleaned_response:
+                    cleaned_response = cleaned_response.split("Assistant:")[0].strip()
+                
+                # If multiple JSON blocks, split by empty lines
+                if '\n\n' in cleaned_response:
+                    json_blocks = cleaned_response.split('\n\n')
+                    parsed_blocks = []
+                    for block in json_blocks:
+                        block = block.strip()
+                        if block and block.startswith('{'):
+                            try:
+                                parsed_blocks.append(json.loads(block))
+                            except json.JSONDecodeError:
+                                continue
+                    if parsed_blocks:
+                        return parsed_blocks if len(parsed_blocks) > 1 else parsed_blocks[0]
+                else:
+                    # Single JSON block - find the first complete JSON object
+                    if cleaned_response.startswith('{'):
+                        # Find the end of the JSON object
+                        brace_count = 0
+                        json_end = 0
+                        for i, char in enumerate(cleaned_response):
+                            if char == '{':
+                                brace_count += 1
+                            elif char == '}':
+                                brace_count -= 1
+                                if brace_count == 0:
+                                    json_end = i + 1
+                                    break
+                        
+                        if json_end > 0:
+                            json_str = cleaned_response[:json_end]
+                            return json.loads(json_str)
+                    
+            except json.JSONDecodeError:
+                pass
+                
+            # If JSON parsing fails, return raw response
+            return {"error": "Failed to parse JSON", "raw_response": raw_response}
         else:
-            return f"Ошибка API: {response.status_code}"
+            return {"error": f"API Error: {response.status_code}"}
             
     except requests.exceptions.RequestException as e:
-        return f"Ошибка подключения к Ollama: {str(e)}"
+        return {"error": f"Connection error to Ollama: {str(e)}"}
     except Exception as e:
-        return f"Произошла ошибка: {str(e)}"
+        return {"error": f"Unexpected error: {str(e)}"}
 
 @app.route('/')
 def index():
@@ -108,25 +190,28 @@ def index():
 @app.route('/api/chat', methods=['POST'])
 def chat():
     try:
-        data = request.get_json()
+        # Ensure proper encoding for Russian text
+        data = request.get_json(force=True)
         message = data.get('message', '').strip()
         
         if not message:
-            return jsonify({'error': 'Сообщение не может быть пустым'}), 400
+            return jsonify({'error': 'Message cannot be empty'}), 400
         
-        # Получаем историю разговора
+        # Get conversation history (increased limit for more context)
         session_id = session.get('session_id', str(uuid.uuid4()))
-        history = get_conversation_history(session_id, limit=5)
+        history = get_conversation_history(session_id, limit=20)
         
-        # Отправляем запрос к Ollama
+        # Send request to Ollama
         response = send_to_ollama(message, history)
         
-        # Сохраняем в базу данных
-        save_message(session_id, message, response)
+        # Save to database (convert response to string for storage)
+        response_str = json.dumps(response) if isinstance(response, (dict, list)) else str(response)
+        save_message(session_id, message, response_str)
         
         return jsonify({
             'response': response,
-            'session_id': session_id
+            'session_id': session_id,
+            'type': 'structured_json'
         })
         
     except Exception as e:
@@ -135,13 +220,19 @@ def chat():
 @app.route('/api/history')
 def get_history():
     session_id = session.get('session_id', str(uuid.uuid4()))
-    history = get_conversation_history(session_id, limit=20)
+    history = get_conversation_history(session_id, limit=50)  # Increased limit
     
     formatted_history = []
     for user_msg, ai_msg, timestamp in reversed(history):
+        # Try to parse AI response as JSON for better display
+        try:
+            ai_parsed = json.loads(ai_msg) if isinstance(ai_msg, str) else ai_msg
+        except:
+            ai_parsed = ai_msg
+            
         formatted_history.append({
             'user': user_msg,
-            'ai': ai_msg,
+            'ai': ai_parsed,
             'timestamp': timestamp
         })
     
@@ -172,10 +263,10 @@ def get_models():
 
 if __name__ == '__main__':
     init_db()
-    print("Запуск локального AI-ассистента...")
-    print(f"Веб-интерфейс будет доступен по адресу: http://localhost:5000")
-    print(f"Подключение к Ollama: {OLLAMA_URL}")
-    print(f"База данных: {DATABASE_PATH}")
+    print("Starting local AI assistant...")
+    print(f"Web interface will be available at: http://localhost:5000")
+    print(f"Ollama connection: {OLLAMA_URL}")
+    print(f"Database: {DATABASE_PATH}")
     print("=" * 50)
     
     # Запуск в режиме доступности из сети

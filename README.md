@@ -1,21 +1,22 @@
-# Local Ollama Project
+# Voicaj LLM API Сервер
 
-Полноценная система локального искусственного интеллекта с веб-интерфейсом, работающая на вашем компьютере без подключения к интернету.
+Локальный AI-ассистент со структурированным JSON выводом на основе Voicaj LLM Schema. Работает на вашем компьютере без подключения к интернету и предоставляет интеллектуальную категоризацию пользовательского ввода для интеграции с iOS/mobile приложениями.
 
 ## Особенности
 
-- **Полная приватность** - все данные остаются на вашем компьютере
+- **Полная приватность** - Все данные остаются на вашем компьютере
+- **Структурированный JSON вывод** - Интеллектуальная категоризация с использованием Voicaj LLM Schema
 - **Память разговоров** - AI запоминает предыдущие сообщения в сессии
-- **Доступ с любого устройства** - подключение через локальную сеть или интернет
-- **Быстрая работа** - модель работает на вашем оборудовании
-- **Современный интерфейс** - красивый и удобный веб-интерфейс
+- **Сетевой доступ** - Подключение с любого устройства в локальной сети
+- **Быстрая работа** - Модель работает на вашем оборудовании
+- **Готов для iOS** - Идеально подходит для интеграции с мобильными приложениями
 
 ## Быстрый запуск
 
 ### 1. Запуск сервера
 ```bash
-# Запустите файл start_server.bat
-start_server.bat
+# Запустите скрипт
+.\start_server.bat
 ```
 
 ### 2. Подключение
@@ -34,7 +35,7 @@ powershell -ExecutionPolicy Bypass -File get_ip.ps1
 - Минимум 8 ГБ RAM (рекомендуется 16 ГБ)
 - Свободное место: 10 ГБ для модели
 
-## Установка компонентов
+## Установка
 
 ### Ollama
 ```bash
@@ -46,7 +47,7 @@ winget install Ollama.Ollama
 pip install flask flask-cors requests python-dotenv
 ```
 
-### Модель AI
+### AI Модель
 ```bash
 & "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull llama3.1:8b
 ```
@@ -55,21 +56,22 @@ pip install flask flask-cors requests python-dotenv
 
 ```
 D:\local_ollama_project\
-├── app.py                 # Основное Flask приложение
+├── app.py                 # Основное Flask приложение с Voicaj Schema
 ├── templates/
 │   └── index.html         # Веб-интерфейс
-├── chat_history.db        # База данных истории
+├── chat_history.db        # База данных истории разговоров
 ├── start_server.bat       # Скрипт запуска
 ├── get_ip.ps1            # Получение IP адресов
-└── requirements.txt       # Python зависимости
+├── requirements.txt       # Python зависимости
+└── .gitignore            # Git ignore файл
 ```
 
 ## Конфигурация
 
 ### Изменение модели
-В файле `app.py` измените:
+В файле `app.py`:
 ```python
-MODEL_NAME = "llama3.1:8b"  # На вашу модель
+MODEL_NAME = "llama3.1:8b"  # Измените на вашу модель
 ```
 
 ### Доступные модели
@@ -78,7 +80,103 @@ MODEL_NAME = "llama3.1:8b"  # На вашу модель
 - `qwen2.5:7b` - Альтернативная
 - `mistral:7b` - Другая опция
 
-## Подключение с других устройств
+## Voicaj LLM Schema
+
+API возвращает структурированный JSON на основе анализа пользовательского ввода:
+
+### Поддерживаемые типы:
+- **task** - Задачи, дедлайны, напоминания
+- **diary_entry** - Личные заметки, размышления
+- **habit** - Повторяющиеся действия, цели
+- **health** - Показатели здоровья, сон, шаги
+- **workout** - Физические активности, упражнения
+- **meal** - Логирование еды, приемы пищи
+- **goal** - Долгосрочные цели
+- **advice** - Коучинг, запросы помощи
+- **study_note** - Обучение, учебные материалы
+- **time_log** - Учет времени
+- **shared_task** - Совместные задачи
+- **focus_session** - Pomodoro сессии
+- **mood_entry** - Эмоциональное состояние
+- **expense** - Финансовые транзакции
+- **travel_plan** - Планирование путешествий
+
+### Формат ответа API:
+```json
+{
+  "response": {
+    "type": "task",
+    "title": "Завершить отчет по проекту",
+    "description": "Завершить и отправить отчет по проекту",
+    "priority": "high",
+    "tags": ["работа", "дедлайн"],
+    "dueDate": "2025-01-10 17:00",
+    "address": null
+  },
+  "session_id": "uuid-string",
+  "type": "structured_json"
+}
+```
+
+## API Эндпоинты
+
+### Основной чат эндпоинт
+```http
+POST /api/chat
+Content-Type: application/json
+
+{
+  "message": "Мне нужно завершить отчет по проекту к пятнице"
+}
+```
+
+### Другие эндпоинты
+- **Получить историю**: `GET /api/history`
+- **Очистить историю**: `POST /api/clear`
+- **Получить модели**: `GET /api/models`
+
+## Интеграция с iOS
+
+### Пример Swift:
+```swift
+struct VoicajResponse: Codable {
+    let response: VoicajData
+    let sessionId: String
+    let type: String
+    
+    enum CodingKeys: String, CodingKey {
+        case response
+        case sessionId = "session_id"
+        case type
+    }
+}
+
+struct VoicajData: Codable {
+    let type: String
+    let title: String
+    let description: String?
+    let priority: String?
+    let tags: [String]?
+    let dueDate: String?
+    let startDate: String?
+    let timestamp: String?
+}
+
+func sendMessage(_ message: String) async throws -> VoicajResponse {
+    let url = URL(string: "http://192.168.1.28:5000/api/chat")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    
+    let body = ["message": message]
+    request.httpBody = try JSONSerialization.data(withJSONObject: body)
+    
+    let (data, _) = try await URLSession.shared.data(for: request)
+    return try JSONDecoder().decode(VoicajResponse.self, from: data)
+}
+```
+
+## Сетевой доступ
 
 ### Подключение в локальной сети
 - Устройства должны быть в одной Wi-Fi сети
@@ -87,23 +185,23 @@ MODEL_NAME = "llama3.1:8b"  # На вашу модель
 ### Настройка брандмауэра
 ```bash
 # PowerShell от администратора
-New-NetFirewallRule -DisplayName "AI Assistant" -Direction Inbound -Protocol TCP -LocalPort 5000 -Action Allow
+New-NetFirewallRule -DisplayName "Voicaj AI Assistant" -Direction Inbound -Protocol TCP -LocalPort 5000 -Action Allow
 ```
 
-### Подключение в локальной сети
-1. Узнайте IP адрес сервера: `get_ip.ps1`
+### Подключение с других устройств
+1. Получите IP сервера: `get_ip.ps1`
 2. Откройте браузер на другом устройстве
 3. Перейдите по адресу: `http://[IP_СЕРВЕРА]:5000`
 
 ## Использование
 
 ### Локальное использование
-1. **Запустите сервер**: `start_server.bat`
+1. **Запустите сервер**: `.\start_server.bat`
 2. **Откройте браузер**: http://localhost:5000
-3. **Начните общение**: введите вопрос в поле ввода
+3. **Начните общение**: Введите сообщение в поле ввода
 
-### Подключение с других устройств в локальной сети
-1. Узнайте IP адрес сервера: `get_ip.ps1`
+### Использование по сети
+1. Получите IP сервера: `get_ip.ps1`
 2. Откройте браузер на другом устройстве
 3. Перейдите по адресу: `http://[IP_СЕРВЕРА]:5000`
 
@@ -159,18 +257,17 @@ New-NetFirewallRule -DisplayName "AI Assistant" -Direction Inbound -Protocol TCP
 2. Убедитесь что все компоненты установлены
 3. Проверьте доступность портов 11434 и 5000
 
-
 ## Обновление
 
-Для обновления модели:
+### Обновление модели
 ```bash
 & "$env:LOCALAPPDATA\Programs\Ollama\ollama.exe" pull llama3.1:8b
 ```
 
-Для обновления приложения:
+### Обновление приложения
 - Замените файлы `app.py` и `templates/index.html`
 - Перезапустите сервер
 
 ---
 
-**Поздравляем! Ваш локальный AI ассистент готов к работе!**
+**Поздравляем! Ваш Voicaj LLM API сервер готов для интеграции с iOS!**
